@@ -6,10 +6,30 @@ Exp A1-A4: Train PatchCore on 4 noise variants
 import torch
 from pathlib import Path
 from anomalib.models import Patchcore
-# from anomalib.data import MVTec  # COMMENTED OUT - Use custom dataloader
 from anomalib.engine import Engine
-# from anomalib.utils.callbacks import MetricsConfigurationCallback  # Module not found in v1.0+
+from anomalib.data import AnomalibDataModule
 import yaml
+
+
+class CustomDataModule(AnomalibDataModule):
+    """Custom DataModule wrapper for PyTorch DataLoaders"""
+    
+    def __init__(self, train_loader, test_loader):
+        super().__init__()
+        self._train_loader = train_loader
+        self._test_loader = test_loader
+    
+    def train_dataloader(self):
+        """Return training dataloader"""
+        return self._train_loader
+    
+    def test_dataloader(self):
+        """Return test dataloader"""
+        return self._test_loader
+    
+    def val_dataloader(self):
+        """Return validation dataloader (use test for validation)"""
+        return self._test_loader
 
 
 class PatchCoreWrapper:
@@ -77,17 +97,17 @@ class PatchCoreWrapper:
         )
         
         # Wrap in Anomalib-compatible datamodule
-        datamodule = self._create_custom_datamodule(train_loader, test_loader)
+        datamodule = CustomDataModule(train_loader, test_loader)
         
-        # Create Engine (v1.0+ API: no task/model/datamodule in __init__)
+        # Create Engine (v1.0+ API)
         engine = Engine(
             default_root_dir=str(output_path)
         )
         
-        # Train (v1.0+ API: pass model and datamodule to fit())
+        # Train
         engine.fit(model=model, datamodule=datamodule)
         
-        # Test (v1.0+ API: pass model and datamodule to test())
+        # Test
         results = engine.test(model=model, datamodule=datamodule)
         
         # Extract metrics
@@ -107,16 +127,6 @@ class PatchCoreWrapper:
         print(f"   Pixel PRO: {metrics['pixel_PRO']:.4f}")
         
         return metrics
-    
-    def _create_custom_datamodule(self, train_loader, test_loader):
-        """
-        Create Anomalib-compatible datamodule from custom loaders
-        
-        This is a placeholder - needs proper implementation
-        """
-        # TODO: Implement proper datamodule wrapper
-        # For now, return None and handle in train()
-        return None
     
     def train_all_variants(self, category, output_dir='results/patchcore'):
         """
