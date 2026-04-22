@@ -6,7 +6,7 @@ Exp A1-A4: Train PatchCore on 4 noise variants
 import torch
 from pathlib import Path
 from anomalib.models import Patchcore
-from anomalib.data import MVTec
+# from anomalib.data import MVTec  # COMMENTED OUT - Use custom dataloader
 from anomalib.engine import Engine
 from anomalib.utils.callbacks import MetricsConfigurationCallback
 import yaml
@@ -66,32 +66,18 @@ class PatchCoreWrapper:
         # Create model
         model = self.create_model()
         
-        # Create datamodule (custom path for noisy variants)
-        if variant == 'clean':
-            # Use original MVTec dataset
-            datamodule = MVTec(
-                root=f'dataset/{category}',
-                category=category,
-                image_size=224,
-                train_batch_size=self.patchcore_config['training']['batch_size'],
-                eval_batch_size=self.patchcore_config['training']['batch_size'],
-                num_workers=self.patchcore_config['training']['num_workers']
-            )
-        else:
-            # Use noisy variant
-            # Note: Need to adapt MVTec datamodule to load from data/noisy/
-            from src.data.dataset_loader import get_mvtec_dataloaders
-            
-            train_loader, test_loader = get_mvtec_dataloaders(
-                category=category,
-                variant=variant,
-                batch_size=self.patchcore_config['training']['batch_size'],
-                num_workers=self.patchcore_config['training']['num_workers']
-            )
-            
-            # Wrap in Anomalib-compatible datamodule
-            # This is a simplified version - may need adjustment
-            datamodule = self._create_custom_datamodule(train_loader, test_loader)
+        # Use custom dataloader for all variants
+        from src.data.dataset_loader import get_mvtec_dataloaders
+        
+        train_loader, test_loader = get_mvtec_dataloaders(
+            category=category,
+            variant=variant,
+            batch_size=self.patchcore_config['training']['batch_size'],
+            num_workers=self.patchcore_config['training']['num_workers']
+        )
+        
+        # Wrap in Anomalib-compatible datamodule
+        datamodule = self._create_custom_datamodule(train_loader, test_loader)
         
         # Create trainer
         engine = Engine(
