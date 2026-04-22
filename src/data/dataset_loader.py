@@ -7,17 +7,13 @@ from typing import List, Tuple
 
 
 class MVTecDataset(Dataset):
-    """
-    Dataset cho MVTec AD + noisy variants
-    Compatible với Anomalib
-    """
 
     def __init__(
         self,
         root: str,
         category: str,
         split: str = 'train',
-        variant: str = None,   # 🔥 FIX: dùng None thay vì ''
+        variant: str = None,
         transform=None,
         mask_transform=None
     ):
@@ -28,16 +24,13 @@ class MVTecDataset(Dataset):
         self.transform = transform
         self.mask_transform = mask_transform
 
-        # 🔥 FIX PATH CLEAN
         if self.variant:
             self.data_path = self.root / variant / category / split
         else:
             self.data_path = self.root / category / split
 
-        # Load samples
         self.samples = self._load_samples()
 
-        # Required by Anomalib
         self.has_normal = any(s['label'] == 0 for s in self.samples)
         self.label_index = {'Normal': 0, 'Anomalous': 1}
 
@@ -48,16 +41,14 @@ class MVTecDataset(Dataset):
 
         if self.split == 'train':
             good_path = self.data_path / 'good'
-            if good_path.exists():
-                for img_path in sorted(good_path.glob('*.png')):
-                    samples.append({
-                        'image_path': str(img_path),
-                        'mask_path': None,
-                        'label': 0,
-                        'defect_type': 'good'
-                    })
-
-        else:  # test
+            for img_path in sorted(good_path.glob('*.png')):
+                samples.append({
+                    'image_path': str(img_path),
+                    'mask_path': None,
+                    'label': 0,
+                    'defect_type': 'good'
+                })
+        else:
             for defect_folder in sorted(self.data_path.iterdir()):
                 if not defect_folder.is_dir():
                     continue
@@ -89,48 +80,35 @@ class MVTecDataset(Dataset):
     def __getitem__(self, idx):
         sample = self.samples[idx]
 
-        try:
-            image = Image.open(sample['image_path']).convert('RGB')
+        image = Image.open(sample['image_path']).convert('RGB')
 
-            # Mask
-            if sample['mask_path'] and Path(sample['mask_path']).exists():
-                mask = Image.open(sample['mask_path']).convert('L')
-            else:
-                mask = Image.fromarray(np.zeros(image.size[::-1], dtype=np.uint8))
+        if sample['mask_path'] and Path(sample['mask_path']).exists():
+            mask = Image.open(sample['mask_path']).convert('L')
+        else:
+            mask = Image.fromarray(np.zeros(image.size[::-1], dtype=np.uint8))
 
-            # Transform
-            if self.transform:
-                image = self.transform(image)
-            else:
-                from torchvision import transforms
-                image = transforms.ToTensor()(image)
+        if self.transform:
+            image = self.transform(image)
+        else:
+            from torchvision import transforms
+            image = transforms.ToTensor()(image)
 
-            if self.mask_transform:
-                mask = self.mask_transform(mask)
-            else:
-                mask = torch.from_numpy(np.array(mask)).float() / 255.0
+        if self.mask_transform:
+            mask = self.mask_transform(mask)
+        else:
+            mask = torch.from_numpy(np.array(mask)).float() / 255.0
 
-            # 🔥 QUAN TRỌNG NHẤT (FIX LỖI CỦA BẠN)
-            return {
-                'image': image,
-                'mask': mask,
-                'label': sample['label'],
-                'label_index': sample['label'],   # ✅ FIX
-                'image_path': sample['image_path'],
-                'mask_path': sample['mask_path'],
-                'defect_type': sample['defect_type']
-            }
+        # 🔥 FIX QUAN TRỌNG
+        return {
+            'image': image,
+            'mask': mask,
+            'label': sample['label'],
+            'label_index': sample['label'],
+            'image_path': sample['image_path'],
+            'mask_path': sample['mask_path'],
+            'defect_type': sample['defect_type']
+        }
 
-        except Exception as e:
-            print(f"\n❌ Error loading sample {idx}")
-            print(f"Path: {sample['image_path']}")
-            print(f"Error: {e}")
-            raise e
-
-
-# =========================
-# DataLoader factory
-# =========================
 
 def get_mvtec_dataloaders(
     category: str,
@@ -152,7 +130,6 @@ def get_mvtec_dataloaders(
             )
         ])
 
-    # Custom collate
     def custom_collate(batch):
         from torch.utils.data._utils.collate import default_collate
 
@@ -167,7 +144,6 @@ def get_mvtec_dataloaders(
 
         return {**tensor_batch, **list_batch}
 
-    # Train (noisy)
     train_dataset = MVTecDataset(
         root='data/noisy',
         category=category,
@@ -176,12 +152,11 @@ def get_mvtec_dataloaders(
         transform=transform
     )
 
-    # Test (original dataset)
     test_dataset = MVTecDataset(
         root='dataset',
         category=category,
         split='test',
-        variant=None,   # 🔥 FIX
+        variant=None,
         transform=transform
     )
 
@@ -204,24 +179,3 @@ def get_mvtec_dataloaders(
     )
 
     return train_loader, test_loader
-
-
-# =========================
-# TEST
-# =========================
-
-if __name__ == '__main__':
-    train_loader, test_loader = get_mvtec_dataloaders(
-        category='bottle',
-        variant='clean',
-        batch_size=4,
-        num_workers=0
-    )
-
-    print("\nTrain batch:")
-    batch = next(iter(train_loader))
-    print(batch['image'].shape, batch['label'])
-
-    print("\nTest batch:")
-    batch = next(iter(test_loader))
-    print(batch['image'].shape, batch['mask'].shape)
