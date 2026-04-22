@@ -47,6 +47,9 @@ class MVTecDataset(Dataset):
         # Load samples
         self.samples = self._load_samples()
         
+        # Add has_normal attribute required by Anomalib
+        self.has_normal = any(s['label'] == 0 for s in self.samples)
+        
         print(f"Loaded {len(self.samples)} samples from {variant}/{category}/{split}")
     
     def _load_samples(self) -> List[dict]:
