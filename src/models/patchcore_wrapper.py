@@ -24,6 +24,27 @@ class CustomDataModule(AnomalibDataModule):
         self._test_loader = test_loader
         # Set test_data attribute required by Anomalib
         self.test_data = test_loader.dataset if hasattr(test_loader, 'dataset') else None
+        # Set label_index from test_data if available
+        if self.test_data and hasattr(self.test_data, 'label_index'):
+            self.label_index = self.test_data.label_index
+        else:
+            self.label_index = {'Normal': 0, 'Anomalous': 1}
+        # Also set samples attribute with label_index
+        if self.test_data and hasattr(self.test_data, 'samples'):
+            # Create a wrapper object for samples that has label_index
+            class SamplesWrapper:
+                def __init__(self, samples, label_index):
+                    self._samples = samples
+                    self.label_index = label_index
+                def __len__(self):
+                    return len(self._samples)
+                def __getitem__(self, idx):
+                    return self._samples[idx]
+                def __iter__(self):
+                    return iter(self._samples)
+            self.samples = SamplesWrapper(self.test_data.samples, self.label_index)
+        else:
+            self.samples = []
     
     def _setup(self, stage=None):
         """Setup method required by AnomalibDataModule (abstract method)"""
