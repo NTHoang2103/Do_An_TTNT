@@ -1,0 +1,103 @@
+# Preprocessing Configuration for Anomaly Detection
+# CLAHE params, augmentation strategy per category, resize target, normalization stats
+
+# Image Quality Check Thresholds
+quality_check:
+  max_mean_pixel: 240  # Overexposed threshold
+  min_mean_pixel: 15   # Underexposed threshold
+  min_std_pixel: 5     # Blank/uniform threshold
+  size_tolerance: 0.1  # 10% tolerance for size mismatch
+
+# Illumination Normalization
+illumination:
+  # CLAHE for texture categories
+  clahe:
+    enabled: true
+    clip_limit: 2.0
+    tile_grid_size: [8, 8]
+    apply_to: ['carpet', 'grid', 'leather', 'tile', 'wood']
+  
+  # Global histogram equalization for objects
+  global_hist_eq:
+    enabled: true
+    apply_to: ['bottle', 'toothbrush']
+  
+  # Gamma correction
+  gamma_correction:
+    enabled: false
+    gamma_overexposed: 0.8
+    gamma_underexposed: 1.2
+
+# Alignment & Crop Strategy
+alignment:
+  target_size: 256
+  crop_size: 224
+  padding_mode: 'reflect'  # 'reflect' for texture, 'constant' for objects
+  
+  # Template matching for objects with fixed pose
+  template_matching:
+    enabled: false
+    apply_to: ['toothbrush', 'capsule', 'pill']
+
+# Augmentation Strategy (Đặc thù cho Anomaly Detection)
+augmentation:
+  # Safe augmentations
+  horizontal_flip:
+    enabled: true
+    probability: 0.5
+    apply_to: ['carpet', 'grid', 'leather', 'tile', 'wood', 'bottle', 'metal_nut', 'hazelnut']
+  
+  vertical_flip:
+    enabled: true
+    probability: 0.5
+    apply_to: ['carpet', 'grid', 'leather', 'tile', 'wood']  # Only textures
+  
+  rotation:
+    enabled: true
+    degrees: [-5, 5]  # Small rotation only
+    probability: 0.3
+  
+  gaussian_blur:
+    enabled: true
+    kernel_size: [3, 3]
+    sigma: [0.1, 0.5]
+    probability: 0.2
+  
+  brightness_jitter:
+    enabled: true
+    brightness: [0.95, 1.05]  # Very light ±5%
+    probability: 0.2
+  
+  # DANGEROUS augmentations - DISABLED for anomaly detection
+  color_jitter:
+    enabled: false  # Color is defect type in Metal Nut, Pill, Carpet
+  
+  random_crop:
+    enabled: false  # May crop out defects
+  
+  cutout:
+    enabled: false  # Creates fake anomalies
+  
+  mixup:
+    enabled: false  # Creates fake anomalies
+
+# Resize & Normalization
+normalization:
+  resize_size: 256
+  crop_size: 224
+  mean: [0.485, 0.456, 0.406]  # ImageNet stats
+  std: [0.229, 0.224, 0.225]   # ImageNet stats
+  to_rgb: true  # Ensure RGB channel order
+
+# Category Groups
+category_groups:
+  texture: ['carpet', 'grid', 'leather', 'tile', 'wood']
+  object: ['bottle', 'cable', 'capsule', 'hazelnut', 'metal_nut', 
+           'pill', 'screw', 'toothbrush', 'transistor', 'zipper']
+
+# Dataset Paths
+paths:
+  dataset_root: 'dataset'
+  output_root: 'data/noisy'
+  quality_reports: 'data/quality_reports'
+  external: 'data/external'

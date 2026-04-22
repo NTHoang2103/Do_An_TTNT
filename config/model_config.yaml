@@ -1,0 +1,168 @@
+# Model Configuration for Week 4-5 Experiments
+# 21 experiments: PatchCore (4) + SoftPatch (4) + EfficientAD (4) + Ablation (9)
+
+# ============================================================
+# EXPERIMENT SETTINGS
+# ============================================================
+
+experiments:
+  # Noise variants to test
+  noise_variants:
+    - clean      # 0% noise (baseline)
+    - noisy-5    # 5% noise
+    - noisy-10   # 10% noise
+    - noisy-20   # 20% noise
+  
+  # Categories to evaluate (all 15)
+  categories:
+    - bottle
+    - cable
+    - capsule
+    - carpet
+    - grid
+    - hazelnut
+    - leather
+    - metal_nut
+    - pill
+    - screw
+    - tile
+    - toothbrush
+    - transistor
+    - wood
+    - zipper
+  
+  # Metrics to log
+  metrics:
+    - image_AUROC
+    - pixel_AUROC
+    - image_F1
+    - pixel_PRO
+
+# ============================================================
+# MODEL A: PATCHCORE (Exp A1-A4)
+# ============================================================
+
+patchcore:
+  backbone: wide_resnet50_2
+  layers:
+    - layer2
+    - layer3
+  coreset_sampling_ratio: 0.1  # 10% coreset
+  num_neighbors: 9
+  
+  training:
+    batch_size: 32
+    num_workers: 8
+  
+  # Anomalib config
+  anomalib:
+    model_name: patchcore
+    normalization: imagenet
+
+# ============================================================
+# MODEL B: SOFTPATCH (Exp A5-A8)
+# ============================================================
+
+softpatch:
+  backbone: wide_resnet50_2
+  layers:
+    - layer2
+    - layer3
+  
+  # Discriminator settings
+  discriminator: LOF  # LOF, Gaussian, or KNN
+  
+  # LOF parameters
+  lof:
+    n_neighbors: 20
+    contamination: 0.1
+  
+  # Gaussian parameters
+  gaussian:
+    covariance_type: full
+  
+  # KNN parameters
+  knn:
+    n_neighbors: 5
+  
+  training:
+    batch_size: 32
+    num_workers: 8
+  
+  # Repository
+  repo_url: https://github.com/TencentYoutuResearch/AnomalyDetection_SoftPatch
+
+# ============================================================
+# MODEL C: EFFICIENTAD (Exp A9-A12)
+# ============================================================
+
+efficientad:
+  # Model architecture
+  teacher_backbone: wide_resnet50_2
+  student_backbone: wide_resnet50_2
+  
+  # Training hyperparameters
+  training:
+    max_epochs: 70
+    batch_size: 1  # EfficientAD uses batch_size=1
+    learning_rate: 0.0001
+    weight_decay: 0.00001
+    num_workers: 8
+  
+  # Loss weights
+  loss:
+    student_teacher_weight: 1.0
+    autoencoder_weight: 1.0
+  
+  # Anomalib config
+  anomalib:
+    model_name: efficient_ad
+    normalization: imagenet
+
+# ============================================================
+# ABLATION STUDY (Exp B1-B9)
+# ============================================================
+
+ablation:
+  # Test 3 discriminators on 3 noise levels
+  discriminators:
+    - LOF
+    - Gaussian
+    - KNN
+  
+  # Test on these noise levels (skip clean)
+  noise_levels:
+    - noisy-5
+    - noisy-10
+    - noisy-20
+  
+  # Use SoftPatch as base model
+  base_model: softpatch
+
+# ============================================================
+# LOGGING & OUTPUT
+# ============================================================
+
+logging:
+  # Experiment tracking
+  use_wandb: false  # Set to true if you have wandb account
+  use_tensorboard: true
+  
+  # Output directories
+  results_dir: results/
+  checkpoints_dir: checkpoints/
+  logs_dir: logs/
+  
+  # Save settings
+  save_predictions: true
+  save_visualizations: true
+  save_metrics: true
+
+# ============================================================
+# HARDWARE
+# ============================================================
+
+hardware:
+  device: cuda  # cuda or cpu
+  gpu_ids: [0]  # List of GPU IDs to use
+  mixed_precision: true  # Use AMP for faster training
