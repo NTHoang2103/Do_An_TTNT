@@ -8,7 +8,7 @@ from pathlib import Path
 from anomalib.models import Patchcore
 # from anomalib.data import MVTec  # COMMENTED OUT - Use custom dataloader
 from anomalib.engine import Engine
-# from anomalib.utils.callbacks import MetricsConfigurationCallback  # KHÔNG CẦN
+# from anomalib.utils.callbacks import MetricsConfigurationCallback  # Module not found in v1.0+
 import yaml
 
 
@@ -79,19 +79,16 @@ class PatchCoreWrapper:
         # Wrap in Anomalib-compatible datamodule
         datamodule = self._create_custom_datamodule(train_loader, test_loader)
         
-        # Create trainer
+        # Create Engine (v1.0+ API: no task/model/datamodule in __init__)
         engine = Engine(
-            task='segmentation',
-            model=model,
-            datamodule=datamodule,
             default_root_dir=str(output_path)
         )
         
-        # Train
-        engine.fit()
+        # Train (v1.0+ API: pass model and datamodule to fit())
+        engine.fit(model=model, datamodule=datamodule)
         
-        # Test
-        results = engine.test()
+        # Test (v1.0+ API: pass model and datamodule to test())
+        results = engine.test(model=model, datamodule=datamodule)
         
         # Extract metrics
         metrics = {
