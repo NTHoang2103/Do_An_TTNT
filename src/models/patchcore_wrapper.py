@@ -8,7 +8,7 @@ from pathlib import Path
 from anomalib.models import Patchcore
 # from anomalib.data import MVTec  # COMMENTED OUT - Use custom dataloader
 from anomalib.engine import Engine
-from anomalib.utils.callbacks import MetricsConfigurationCallback
+# from anomalib.utils.callbacks import MetricsConfigurationCallback  # KHÔNG CẦN
 import yaml
 
 
