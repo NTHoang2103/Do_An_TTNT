@@ -22,6 +22,8 @@ class CustomDataModule(AnomalibDataModule):
         )
         self._train_loader = train_loader
         self._test_loader = test_loader
+        # Set test_data attribute required by Anomalib
+        self.test_data = test_loader.dataset if hasattr(test_loader, 'dataset') else None
     
     def _setup(self, stage=None):
         """Setup method required by AnomalibDataModule (abstract method)"""
