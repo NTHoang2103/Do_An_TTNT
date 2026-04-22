@@ -19,6 +19,11 @@ class CustomDataModule(AnomalibDataModule):
         self._train_loader = train_loader
         self._test_loader = test_loader
     
+    def _setup(self, stage=None):
+        """Setup method required by AnomalibDataModule (abstract method)"""
+        # Data is already loaded, nothing to setup
+        pass
+    
     def train_dataloader(self):
         """Return training dataloader"""
         return self._train_loader
