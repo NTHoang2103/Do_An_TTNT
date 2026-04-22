@@ -14,8 +14,12 @@ import yaml
 class CustomDataModule(AnomalibDataModule):
     """Custom DataModule wrapper for PyTorch DataLoaders"""
     
-    def __init__(self, train_loader, test_loader):
-        super().__init__()
+    def __init__(self, train_loader, test_loader, train_batch_size=32, eval_batch_size=32, num_workers=8):
+        super().__init__(
+            train_batch_size=train_batch_size,
+            eval_batch_size=eval_batch_size,
+            num_workers=num_workers
+        )
         self._train_loader = train_loader
         self._test_loader = test_loader
     
