@@ -44,11 +44,23 @@ class MVTecDataset(Dataset):
         # Thuộc tính mà Anomalib yêu cầu
         self.has_normal = True  # Dataset có chứa ảnh normal
         
+        # Label index mapping (Anomalib cần để map label names)
+        self.label_index = {
+            'good': 0,
+            'normal': 0
+        }
+        
         # Paths
         self.data_path = self.root / variant / category / split
         
         # Load samples
         self.samples = self._load_samples()
+        
+        # Update label_index với các defect types từ samples
+        for sample in self.samples:
+            defect_type = sample['defect_type']
+            if defect_type not in self.label_index:
+                self.label_index[defect_type] = 1  # Tất cả defects đều là label 1
         
         print(f"Loaded {len(self.samples)} samples from {variant}/{category}/{split}")
     
