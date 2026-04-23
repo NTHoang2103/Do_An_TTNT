@@ -41,6 +41,9 @@ class MVTecDataset(Dataset):
         self.transform = transform
         self.mask_transform = mask_transform
         
+        # Thuộc tính mà Anomalib yêu cầu
+        self.has_normal = True  # Dataset có chứa ảnh normal
+        
         # Paths
         self.data_path = self.root / variant / category / split
         
