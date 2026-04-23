@@ -84,16 +84,12 @@ class PatchCoreWrapper:
                 eval_batch_size=self.patchcore_config['training']['batch_size'],
                 num_workers=self.patchcore_config['training']['num_workers']
             )
-            
-            print(f"Loaded {len(datamodule.train_data)} samples from {variant}/{category}/train")
-            print(f"Loaded {len(datamodule.test_data)} samples from /{category}/test")
         
         # Create trainer
         engine = Engine(
             default_root_dir=str(output_path),
             accelerator='gpu' if self.device == 'cuda' else 'cpu',
             devices=1,
-            max_epochs=self.patchcore_config['training']['max_epochs'],
             logger=False
         )
         
