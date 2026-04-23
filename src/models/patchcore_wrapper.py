@@ -87,6 +87,10 @@ class PatchCoreWrapper:
                 )
                 self._train_loader = train_loader
                 self._test_loader = test_loader
+                # Add required attributes that Anomalib expects
+                self.train_data = train_loader.dataset
+                self.val_data = test_loader.dataset
+                self.test_data = test_loader.dataset
             
             def _setup(self, stage=None):
                 pass
