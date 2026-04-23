@@ -68,43 +68,40 @@ class PatchCoreWrapper:
         # Create datamodule (custom path for noisy variants)
         if variant == 'clean':
             # Use original MVTec dataset
-            datamodule = MVTecAD(  # Changed from MVTec in v2.3+
+            datamodule = MVTecAD(
                 root=f'dataset/{category}',
                 category=category,
-                image_size=224,
                 train_batch_size=self.patchcore_config['training']['batch_size'],
                 eval_batch_size=self.patchcore_config['training']['batch_size'],
                 num_workers=self.patchcore_config['training']['num_workers']
             )
         else:
-            # Use noisy variant
-            # Note: Need to adapt MVTec datamodule to load from data/noisy/
-            from src.data.dataset_loader import get_mvtec_dataloaders
-            
-            train_loader, test_loader = get_mvtec_dataloaders(
+            # Use noisy variant - point to noisy data folder
+            datamodule = MVTecAD(
+                root=f'data/noisy/{variant}/{category}',
                 category=category,
-                variant=variant,
-                batch_size=self.patchcore_config['training']['batch_size'],
+                train_batch_size=self.patchcore_config['training']['batch_size'],
+                eval_batch_size=self.patchcore_config['training']['batch_size'],
                 num_workers=self.patchcore_config['training']['num_workers']
             )
             
-            # Wrap in Anomalib-compatible datamodule
-            # This is a simplified version - may need adjustment
-            datamodule = self._create_custom_datamodule(train_loader, test_loader)
+            print(f"Loaded {len(datamodule.train_data)} samples from {variant}/{category}/train")
+            print(f"Loaded {len(datamodule.test_data)} samples from /{category}/test")
         
         # Create trainer
         engine = Engine(
-            task='segmentation',
-            model=model,
-            datamodule=datamodule,
-            default_root_dir=str(output_path)
+            default_root_dir=str(output_path),
+            accelerator='gpu' if self.device == 'cuda' else 'cpu',
+            devices=1,
+            max_epochs=self.patchcore_config['training']['max_epochs'],
+            logger=False
         )
         
         # Train
-        engine.fit()
+        engine.fit(model=model, datamodule=datamodule)
         
         # Test
-        results = engine.test()
+        results = engine.test(model=model, datamodule=datamodule)
         
         # Extract metrics
         metrics = {
