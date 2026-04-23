@@ -65,25 +65,47 @@ class PatchCoreWrapper:
         # Create model
         model = self.create_model()
         
-        # Create datamodule (custom path for noisy variants)
-        if variant == 'clean':
-            # Use original MVTec dataset
-            datamodule = MVTecAD(
-                root=f'dataset/{category}',
-                category=category,
-                train_batch_size=self.patchcore_config['training']['batch_size'],
-                eval_batch_size=self.patchcore_config['training']['batch_size'],
-                num_workers=self.patchcore_config['training']['num_workers']
-            )
-        else:
-            # Use noisy variant - point to noisy data folder
-            datamodule = MVTecAD(
-                root=f'data/noisy/{variant}/{category}',
-                category=category,
-                train_batch_size=self.patchcore_config['training']['batch_size'],
-                eval_batch_size=self.patchcore_config['training']['batch_size'],
-                num_workers=self.patchcore_config['training']['num_workers']
-            )
+        # Use custom dataloader instead of MVTecAD to avoid download
+        from src.data.dataset_loader import get_mvtec_dataloaders
+        
+        train_loader, test_loader = get_mvtec_dataloaders(
+            category=category,
+            variant=variant,
+            batch_size=self.patchcore_config['training']['batch_size'],
+            num_workers=self.patchcore_config['training']['num_workers']
+        )
+        
+        # Wrap in Anomalib-compatible datamodule
+        from anomalib.data import AnomalibDataModule
+        
+        class CustomDataModule(AnomalibDataModule):
+            def __init__(self, train_loader, test_loader, train_batch_size, eval_batch_size, num_workers):
+                super().__init__(
+                    train_batch_size=train_batch_size,
+                    eval_batch_size=eval_batch_size,
+                    num_workers=num_workers
+                )
+                self._train_loader = train_loader
+                self._test_loader = test_loader
+            
+            def _setup(self, stage=None):
+                pass
+            
+            def train_dataloader(self):
+                return self._train_loader
+            
+            def val_dataloader(self):
+                return self._test_loader
+            
+            def test_dataloader(self):
+                return self._test_loader
+        
+        datamodule = CustomDataModule(
+            train_loader, test_loader,
+            train_batch_size=self.patchcore_config['training']['batch_size'],
+            eval_batch_size=self.patchcore_config['training']['batch_size'],
+            num_workers=self.patchcore_config['training']['num_workers']
+        )
         
         # Create trainer
         engine = Engine(
