@@ -1,7 +1,5 @@
 """
-PatchCore Wrapper for Anomalib (Compatible with anomalib 2.x)
-
-Exp A1-A4: Train PatchCore on 4 noise variants
+PatchCore Wrapper for Anomalib (Compatible with anomalib 2.3.3)
 """
 
 import torch
@@ -14,11 +12,11 @@ import yaml
 
 class CustomDataModule(AnomalibDataModule):
     """
-    Minimal AnomalibDataModule wrapper around PyTorch DataLoaders
+    Custom DataModule để wrap PyTorch DataLoader cho anomalib
     """
 
     def __init__(self, train_loader, test_loader,
-                 train_batch_size=32, eval_batch_size=32, num_workers=8):
+                 train_batch_size=32, eval_batch_size=32, num_workers=4):
         super().__init__(
             train_batch_size=train_batch_size,
             eval_batch_size=eval_batch_size,
@@ -27,12 +25,12 @@ class CustomDataModule(AnomalibDataModule):
         self._train_loader = train_loader
         self._test_loader = test_loader
 
-        # IMPORTANT: expose dataset cho anomalib
+        # expose dataset cho anomalib (QUAN TRỌNG)
         self.train_data = train_loader.dataset
         self.test_data = test_loader.dataset
 
-    def setup(self, stage=None):
-        """Required by Lightning but not used"""
+    # 🔥 FIX QUAN TRỌNG: phải là _setup (không phải setup)
+    def _setup(self, stage=None):
         pass
 
     def train_dataloader(self):
@@ -54,7 +52,7 @@ class PatchCoreWrapper:
         self.device = self.config['hardware']['device']
 
     def create_model(self):
-        """Create PatchCore model (anomalib 2.x)"""
+        """Tạo PatchCore model"""
         model = Patchcore(
             backbone=self.patchcore_config['backbone'],
             layers=self.patchcore_config['layers'],
@@ -93,7 +91,7 @@ class PatchCoreWrapper:
             num_workers=self.patchcore_config['training']['num_workers'],
         )
 
-        # 4. Engine (anomalib 2.x)
+        # 4. Engine
         engine = Engine(default_root_dir=str(output_path))
 
         # 5. Train
@@ -102,7 +100,7 @@ class PatchCoreWrapper:
         # 6. Test
         results = engine.test(model=model, datamodule=datamodule)
 
-        # 7. Extract metrics
+        # 7. Extract metrics (fix crash ngầm)
         result = results[0] if isinstance(results, list) else results
 
         metrics = {
