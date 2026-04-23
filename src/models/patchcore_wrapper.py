@@ -6,9 +6,8 @@ Exp A1-A4: Train PatchCore on 4 noise variants
 import torch
 from pathlib import Path
 from anomalib.models import Patchcore
-from anomalib.data import MVTec
+from anomalib.data import MVTecAD  # Changed from MVTec in v2.3+
 from anomalib.engine import Engine
-from anomalib.utils.callbacks import MetricsConfigurationCallback
 import yaml
 
 
@@ -69,7 +68,7 @@ class PatchCoreWrapper:
         # Create datamodule (custom path for noisy variants)
         if variant == 'clean':
             # Use original MVTec dataset
-            datamodule = MVTec(
+            datamodule = MVTecAD(  # Changed from MVTec in v2.3+
                 root=f'dataset/{category}',
                 category=category,
                 image_size=224,
