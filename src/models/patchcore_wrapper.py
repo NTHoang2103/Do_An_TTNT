@@ -6,8 +6,9 @@ Exp A1-A4: Train PatchCore on 4 noise variants
 import torch
 from pathlib import Path
 from anomalib.models import Patchcore
-from anomalib.data import MVTecAD  # Changed from MVTec in v2.3+
+from anomalib.data import MVTec
 from anomalib.engine import Engine
+from anomalib.utils.callbacks import MetricsConfigurationCallback
 import yaml
 
 
@@ -65,65 +66,46 @@ class PatchCoreWrapper:
         # Create model
         model = self.create_model()
         
-        # Use custom dataloader instead of MVTecAD to avoid download
-        from src.data.dataset_loader import get_mvtec_dataloaders
-        
-        train_loader, test_loader = get_mvtec_dataloaders(
-            category=category,
-            variant=variant,
-            batch_size=self.patchcore_config['training']['batch_size'],
-            num_workers=self.patchcore_config['training']['num_workers']
-        )
-        
-        # Wrap in Anomalib-compatible datamodule
-        from anomalib.data import AnomalibDataModule
-        
-        class CustomDataModule(AnomalibDataModule):
-            def __init__(self, train_loader, test_loader, train_batch_size, eval_batch_size, num_workers):
-                super().__init__(
-                    train_batch_size=train_batch_size,
-                    eval_batch_size=eval_batch_size,
-                    num_workers=num_workers
-                )
-                self._train_loader = train_loader
-                self._test_loader = test_loader
-                # Add required attributes that Anomalib expects
-                self.train_data = train_loader.dataset
-                self.val_data = test_loader.dataset
-                self.test_data = test_loader.dataset
+        # Create datamodule (custom path for noisy variants)
+        if variant == 'clean':
+            # Use original MVTec dataset
+            datamodule = MVTec(
+                root=f'dataset/{category}',
+                category=category,
+                image_size=224,
+                train_batch_size=self.patchcore_config['training']['batch_size'],
+                eval_batch_size=self.patchcore_config['training']['batch_size'],
+                num_workers=self.patchcore_config['training']['num_workers']
+            )
+        else:
+            # Use noisy variant
+            # Note: Need to adapt MVTec datamodule to load from data/noisy/
+            from src.data.dataset_loader import get_mvtec_dataloaders
             
-            def _setup(self, stage=None):
-                pass
+            train_loader, test_loader = get_mvtec_dataloaders(
+                category=category,
+                variant=variant,
+                batch_size=self.patchcore_config['training']['batch_size'],
+                num_workers=self.patchcore_config['training']['num_workers']
+            )
             
-            def train_dataloader(self):
-                return self._train_loader
-            
-            def val_dataloader(self):
-                return self._test_loader
-            
-            def test_dataloader(self):
-                return self._test_loader
-        
-        datamodule = CustomDataModule(
-            train_loader, test_loader,
-            train_batch_size=self.patchcore_config['training']['batch_size'],
-            eval_batch_size=self.patchcore_config['training']['batch_size'],
-            num_workers=self.patchcore_config['training']['num_workers']
-        )
+            # Wrap in Anomalib-compatible datamodule
+            # This is a simplified version - may need adjustment
+            datamodule = self._create_custom_datamodule(train_loader, test_loader)
         
         # Create trainer
         engine = Engine(
-            default_root_dir=str(output_path),
-            accelerator='gpu' if self.device == 'cuda' else 'cpu',
-            devices=1,
-            logger=False
+            task='segmentation',
+            model=model,
+            datamodule=datamodule,
+            default_root_dir=str(output_path)
         )
         
         # Train
-        engine.fit(model=model, datamodule=datamodule)
+        engine.fit()
         
         # Test
-        results = engine.test(model=model, datamodule=datamodule)
+        results = engine.test()
         
         # Extract metrics
         metrics = {
