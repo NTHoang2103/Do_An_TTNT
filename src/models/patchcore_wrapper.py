@@ -6,9 +6,7 @@ Exp A1-A4: Train PatchCore on 4 noise variants
 import torch
 from pathlib import Path
 from anomalib.models import Patchcore
-from anomalib.data import MVTec
 from anomalib.engine import Engine
-from anomalib.utils.callbacks import MetricsConfigurationCallback
 import yaml
 
 
@@ -66,46 +64,66 @@ class PatchCoreWrapper:
         # Create model
         model = self.create_model()
         
-        # Create datamodule (custom path for noisy variants)
-        if variant == 'clean':
-            # Use original MVTec dataset
-            datamodule = MVTec(
-                root=f'dataset/{category}',
-                category=category,
-                image_size=224,
-                train_batch_size=self.patchcore_config['training']['batch_size'],
-                eval_batch_size=self.patchcore_config['training']['batch_size'],
-                num_workers=self.patchcore_config['training']['num_workers']
-            )
-        else:
-            # Use noisy variant
-            # Note: Need to adapt MVTec datamodule to load from data/noisy/
-            from src.data.dataset_loader import get_mvtec_dataloaders
+        # Use custom dataloader for all variants
+        from src.data.dataset_loader import get_mvtec_dataloaders
+        
+        train_loader, test_loader = get_mvtec_dataloaders(
+            category=category,
+            variant=variant,
+            batch_size=self.patchcore_config['training']['batch_size'],
+            num_workers=self.patchcore_config['training']['num_workers']
+        )
+        
+        # Wrap in Lightning datamodule
+        from lightning.pytorch import LightningDataModule
+        
+        class CustomDataModule(LightningDataModule):
+            def __init__(self, train_loader, test_loader, category="bottle"):
+                super().__init__()
+                self._train_loader = train_loader
+                self._test_loader = test_loader
+                self.category = category
+                self.name = "mvtec"
+                
+                # CRITICAL: Copy label_index from dataset to datamodule
+                # Anomalib expects this on the datamodule, not the dataset
+                if hasattr(train_loader.dataset, 'label_index'):
+                    self.label_index = train_loader.dataset.label_index
+                else:
+                    self.label_index = {'good': 0, 'normal': 0}
+                
+                # Also copy train_data and test_data references
+                self.train_data = train_loader.dataset
+                self.test_data = test_loader.dataset
             
-            train_loader, test_loader = get_mvtec_dataloaders(
-                category=category,
-                variant=variant,
-                batch_size=self.patchcore_config['training']['batch_size'],
-                num_workers=self.patchcore_config['training']['num_workers']
-            )
+            def setup(self, stage=None):
+                # Không cần setup gì vì dataloaders đã sẵn sàng
+                pass
             
-            # Wrap in Anomalib-compatible datamodule
-            # This is a simplified version - may need adjustment
-            datamodule = self._create_custom_datamodule(train_loader, test_loader)
+            def train_dataloader(self):
+                return self._train_loader
+            
+            def val_dataloader(self):
+                return self._test_loader
+            
+            def test_dataloader(self):
+                return self._test_loader
+        
+        datamodule = CustomDataModule(train_loader, test_loader, category=category)
         
         # Create trainer
         engine = Engine(
-            task='segmentation',
-            model=model,
-            datamodule=datamodule,
-            default_root_dir=str(output_path)
+            default_root_dir=str(output_path),
+            accelerator='gpu' if self.device == 'cuda' else 'cpu',
+            devices=1,
+            logger=False
         )
         
         # Train
-        engine.fit()
+        engine.fit(model=model, datamodule=datamodule)
         
         # Test
-        results = engine.test()
+        results = engine.test(model=model, datamodule=datamodule)
         
         # Extract metrics
         metrics = {
@@ -124,16 +142,6 @@ class PatchCoreWrapper:
         print(f"   Pixel PRO: {metrics['pixel_PRO']:.4f}")
         
         return metrics
-    
-    def _create_custom_datamodule(self, train_loader, test_loader):
-        """
-        Create Anomalib-compatible datamodule from custom loaders
-        
-        This is a placeholder - needs proper implementation
-        """
-        # TODO: Implement proper datamodule wrapper
-        # For now, return None and handle in train()
-        return None
     
     def train_all_variants(self, category, output_dir='results/patchcore'):
         """
