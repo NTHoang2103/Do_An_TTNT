@@ -41,26 +41,11 @@ class MVTecDataset(Dataset):
         self.transform = transform
         self.mask_transform = mask_transform
         
-        # Thuộc tính mà Anomalib yêu cầu
-        self.has_normal = True  # Dataset có chứa ảnh normal
-        
-        # Label index mapping (Anomalib cần để map label names)
-        self.label_index = {
-            'good': 0,
-            'normal': 0
-        }
-        
         # Paths
         self.data_path = self.root / variant / category / split
         
         # Load samples
         self.samples = self._load_samples()
-        
-        # Update label_index với các defect types từ samples
-        for sample in self.samples:
-            defect_type = sample['defect_type']
-            if defect_type not in self.label_index:
-                self.label_index[defect_type] = 1  # Tất cả defects đều là label 1
         
         print(f"Loaded {len(self.samples)} samples from {variant}/{category}/{split}")
     
@@ -237,8 +222,7 @@ def get_mvtec_dataloaders(
     variant: str = 'clean',
     batch_size: int = 32,
     num_workers: int = 4,
-    transform=None,
-    root_dir: str = None
+    transform=None
 ) -> Tuple[DataLoader, DataLoader]:
     """
     Get train and test dataloaders for MVTec AD
@@ -249,25 +233,10 @@ def get_mvtec_dataloaders(
         batch_size: Batch size
         num_workers: Number of workers
         transform: Transform to apply
-        root_dir: Root directory of project (auto-detect if None)
     
     Returns:
         train_loader, test_loader
     """
-    # Auto-detect root directory
-    if root_dir is None:
-        # Try to find project root
-        current = Path.cwd()
-        # Check if we're in notebooks/ or project root
-        if (current / 'data').exists():
-            root_dir = current
-        elif (current.parent / 'data').exists():
-            root_dir = current.parent
-        else:
-            raise FileNotFoundError(f"Cannot find project root from {current}")
-    else:
-        root_dir = Path(root_dir)
-    
     # Default transform if not provided
     if transform is None:
         from torchvision import transforms
@@ -300,7 +269,7 @@ def get_mvtec_dataloaders(
     
     # Train dataset (from noisy variants)
     train_dataset = MVTecDataset(
-        root=str(root_dir / 'data' / 'noisy'),
+        root='data/noisy',
         category=category,
         split='train',
         variant=variant,
@@ -308,8 +277,9 @@ def get_mvtec_dataloaders(
     )
     
     # Test dataset (always use original dataset, not noisy)
+    # Create a simple wrapper to load from original dataset
     test_dataset = MVTecDataset(
-        root=str(root_dir / 'dataset'),
+        root='dataset',
         category=category,
         split='test',
         variant='',  # Empty variant for original dataset
@@ -317,7 +287,7 @@ def get_mvtec_dataloaders(
     )
     
     # Override the data_path to point to original dataset
-    test_dataset.data_path = root_dir / 'dataset' / category / 'test'
+    test_dataset.data_path = Path('dataset') / category / 'test'
     test_dataset.samples = test_dataset._load_samples()
     
     # Dataloaders
