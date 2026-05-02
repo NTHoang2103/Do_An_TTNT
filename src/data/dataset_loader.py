@@ -247,25 +247,29 @@ def get_mvtec_dataloaders(
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
     
-    # Custom collate function to handle string fields
+    # Custom collate function to return Anomalib ImageBatch format
     def custom_collate(batch):
-        """Custom collate to handle mixed types (tensors + strings)"""
+        """Custom collate to return Anomalib Batch format"""
         from torch.utils.data._utils.collate import default_collate
+        from anomalib.data import ImageBatch
         
         # Separate tensor fields and non-tensor fields
-        tensor_batch = {}
-        list_batch = {}
+        images = default_collate([d['image'] for d in batch])
+        masks = default_collate([d['mask'] for d in batch])
+        labels = default_collate([d['label'] for d in batch])
         
-        for key in batch[0].keys():
-            if isinstance(batch[0][key], torch.Tensor):
-                # Stack tensors
-                tensor_batch[key] = default_collate([d[key] for d in batch])
-            else:
-                # Keep as list for strings/None
-                list_batch[key] = [d[key] for d in batch]
+        # Keep paths as lists
+        image_paths = [d['image_path'] for d in batch]
+        mask_paths = [d.get('mask_path') for d in batch]
         
-        # Merge
-        return {**tensor_batch, **list_batch}
+        # Return Anomalib ImageBatch format
+        return ImageBatch(
+            image=images,
+            gt_mask=masks,
+            gt_label=labels,
+            image_path=image_paths,
+            mask_path=mask_paths
+        )
     
     # Train dataset (from noisy variants)
     train_dataset = MVTecDataset(
