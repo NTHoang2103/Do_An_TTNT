@@ -3,11 +3,19 @@ PatchCore Wrapper for Anomalib
 Exp A1-A4: Train PatchCore on 4 noise variants
 """
 
+# CRITICAL: Disable Rich library BEFORE any imports to prevent Kaggle infinite loop
+import os
+os.environ['LIGHTNING_DISABLE_PROGRESS_BAR'] = '1'
+os.environ['ANOMALIB_DISABLE_PROGRESS_BAR'] = '1'
+os.environ['TQDM_DISABLE'] = '1'
+
 import torch
 from pathlib import Path
 from anomalib.models import Patchcore
 from anomalib.engine import Engine
 import yaml
+import warnings
+warnings.filterwarnings('ignore')
 
 
 class PatchCoreWrapper:
@@ -111,12 +119,14 @@ class PatchCoreWrapper:
         
         datamodule = CustomDataModule(train_loader, test_loader, category=category)
         
-        # Create trainer
+        # Create trainer with all progress bars disabled
         engine = Engine(
             default_root_dir=str(output_path),
             accelerator='gpu' if self.device == 'cuda' else 'cpu',
             devices=1,
-            logger=False
+            logger=False,
+            enable_progress_bar=False,  # Disable Lightning progress bar
+            enable_model_summary=False   # Disable model summary
         )
         
         # Train
